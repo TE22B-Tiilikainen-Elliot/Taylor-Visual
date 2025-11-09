@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Taylor Polynomial Visualizer</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            overflow: hidden;
+            background: #000;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }
+        
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100vh;
+        }
+        
+        #info {
+            position: fixed;
+            top: 8%;
+            left: 0;
+            right: 0;
+            width: 100%;
+            color: #fff;
+            pointer-events: none;
+        }
+        
+        .polynomial-label {
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            align-items: center;
+            width: 100%;
+            gap: 20px;
+            font-size: 24px;
+            font-weight: 600;
+        }
+        
+        .function-label {
+            font-weight: 700;
+            font-size: 28px;
+            text-shadow: 0 0 20px currentColor;
+            transition: color 0.5s ease;
+            text-align: right;
+            padding-right: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+        }
+        
+        .approx-symbol {
+            font-size: 32px;
+            font-weight: 400;
+            text-align: center;
+        }
+        
+        .polynomial-content {
+            font-size: 24px;
+            letter-spacing: 1px;
+            text-shadow: 0 0 15px currentColor;
+            text-align: left;
+            padding-left: 10px;
+            display: flex;
+            align-items: center;
+            word-spacing: 4px;
+        }
+        
+        @keyframes termFadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+        
+        .fraction {
+            display: inline-block;
+            vertical-align: middle;
+            text-align: center;
+            font-size: 0.85em;
+        }
+        
+        .fraction .numerator {
+            display: block;
+            border-bottom: 1px solid currentColor;
+            padding-bottom: 2px;
+        }
+        
+        .fraction .denominator {
+            display: block;
+            padding-top: 2px;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    <div id="info">
+        <div class="polynomial-label">
+            <div class="function-label" id="funcLabel">sin(x)</div>
+            <span class="approx-symbol">≈</span>
+            <div class="polynomial-content" id="polynomial"></div>
+        </div>
+    </div>
+    
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const funcLabel = document.getElementById('funcLabel');
+        const polynomialDisplay = document.getElementById('polynomial');
+        
+        // Canvas setup
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+        
+        // Color palette
+        const colorPalette = [
+            '#00ffff', // Cyan
+            '#ff00ff', // Magenta
+            '#00ff88', // Mint
+            '#ff6b6b', // Coral
+            '#4ecdc4', // Turquoise
+            '#ffd93d', // Gold
+            '#ff8ed4', // Pink
+            '#8b5cf6', // Purple
+            '#22d3ee', // Sky blue
+            '#f97316'  // Orange
+        ];
+        
+        // Animation state
+        const state = {
+            currentFunction: null,
+            currentColor: '#00ffff',
+            polynomialColor: '#ffff00',
+            center: 0,
+            terms: [],
+            currentTermIndex: 0,
+            animationPhase: 'fadingIn',
+            fadeAlpha: 0,
+            timer: 0,
+            holdTimer: 0,
+            maxTerms: 10,
+            termBuildDuration: 1200, // ms to build each term
+            holdDuration: 1500, // ms to hold completed polynomial
+            fadeDuration: 800, // ms for fade transitions
+            xRangeMultiplier: 1,
+            lastCompletedTermIndex: -1
+        };
+        
+        // Generate random polynomial function
+        function generateRandomPolynomial() {
+            const degree = 3 + Math.floor(Math.random() * 3) * 2; // 3, 5, or 7 (odd degrees)
+            const coeffs = [];
+            const xRange = 2 + Math.random() * 2;
+            
+            for (let i = 0; i <= degree; i++) {
+                if (i === degree) {
+                    // Leading coefficient (non-zero)
+                    coeffs[i] = (Math.random() - 0.5) * 0.3;
+                } else {
+                    coeffs[i] = (Math.random() - 0.5) * 2;
+                }
+            }
+            
+            return {
+                label: `P(x)`,
+                compute: (x) => {
+                    let sum = 0;
+                    for (let i = 0; i <= degree; i++) {
+                        sum += coeffs[i] * Math.pow(x, i);
+                    }
+                    return sum;
+                },
+                getCoefficient: (n) => {
+                    return n <= degree ? coeffs[n] : 0;
+                },
+                maxTerms: degree + 1,
+                xRangeMultiplier: xRange,
+                isTrig: false
+            };
+        }
+        
+        // Function definitions with Taylor series coefficients
+        const functionGenerators = [
+            () => ({
+                label: 'sin(x)',
+                compute: (x) => Math.sin(x),
+                getCoefficient: (n) => {
+                    if (n % 2 === 0) return 0;
+                    const sign = Math.pow(-1, (n - 1) / 2);
+                    return sign / factorialMemo(n);
+                },
+                maxTerms: 15,
+                xRangeMultiplier: 2 + Math.random() * 2,
+                isTrig: true
+            }),
+            () => ({
+                label: 'cos(x)',
+                compute: (x) => Math.cos(x),
+                getCoefficient: (n) => {
+                    if (n % 2 === 1) return 0;
+                    const sign = Math.pow(-1, n / 2);
+                    return sign / factorialMemo(n);
+                },
+                maxTerms: 15,
+                xRangeMultiplier: 2 + Math.random() * 2,
+                isTrig: true
+            }),
+            () => ({
+                label: 'e^x',
+                compute: (x) => Math.exp(x),
+                getCoefficient: (n) => {
+                    return 1 / factorialMemo(n);
+                },
+                maxTerms: 10,
+                xRangeMultiplier: 1,
+                isTrig: false
+            }),
+            generateRandomPolynomial,
+            generateRandomPolynomial,
+            generateRandomPolynomial
+        ];
+        
+        // Memoized factorial
+        const factorialCache = [1];
+        function factorialMemo(n) {
+            if (factorialCache[n] !== undefined) return factorialCache[n];
+            let result = factorialCache[factorialCache.length - 1];
+            for (let i = factorialCache.length; i <= n; i++) {
+                result *= i;
+                factorialCache[i] = result;
+            }
+            return factorialCache[n];
+        }
+        
+        // Utility functions
+        function lerp(a, b, t) {
+            return a + (b - a) * t;
+        }
+        
+        function smoothStep(t) {
+            return t * t * (3 - 2 * t);
+        }
+        
+        function easeInOut(t) {
+            return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+        }
+        
+        // Coordinate transformation
+        function worldToScreen(x, y) {
+            const xRange = Math.PI * state.xRangeMultiplier;
+            const yRange = 3;
+            const sx = (x / xRange) * (canvas.width * 0.45) + canvas.width / 2;
+            const sy = canvas.height / 2 - (y / yRange) * (canvas.height * 0.4);
+            return { x: sx, y: sy };
+        }
+        
+        function screenToWorld(sx, sy) {
+            const x = ((sx - canvas.width / 2) / (canvas.width * 0.4)) * xRange;
+            const y = ((canvas.height / 2 - sy) / (canvas.height * 0.35)) * yRange;
+            return { x, y };
+        }
+        
+        // Drawing functions
+        function drawAxes() {
+            ctx.strokeStyle = '#555';
+            ctx.lineWidth = 1.5;
+            
+            // X-axis
+            const y0 = worldToScreen(0, 0).y;
+            ctx.beginPath();
+            ctx.moveTo(0, y0);
+            ctx.lineTo(canvas.width, y0);
+            ctx.stroke();
+            
+            // Y-axis
+            const x0 = worldToScreen(0, 0).x;
+            ctx.beginPath();
+            ctx.moveTo(x0, 0);
+            ctx.lineTo(x0, canvas.height);
+            ctx.stroke();
+        }
+        
+        function drawFunction(func, color, alpha = 1) {
+            const xRange = Math.PI * state.xRangeMultiplier;
+            ctx.strokeStyle = color;
+            ctx.globalAlpha = alpha;
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            
+            let started = false;
+            const step = (2 * xRange) / (canvas.width * 2);
+            
+            for (let x = -xRange; x <= xRange; x += step) {
+                const y = func(x);
+                if (!isFinite(y) || Math.abs(y) > 100) continue;
+                
+                const screen = worldToScreen(x, y);
+                
+                if (!started) {
+                    ctx.moveTo(screen.x, screen.y);
+                    started = true;
+                } else {
+                    ctx.lineTo(screen.x, screen.y);
+                }
+            }
+            
+            ctx.stroke();
+            ctx.globalAlpha = 1;
+        }
+        
+        function evaluateTaylorPolynomial(x, terms) {
+            let sum = 0;
+            for (let i = 0; i < terms.length; i++) {
+                const term = terms[i];
+                sum += term.coefficient * Math.pow(x, term.power);
+            }
+            return sum;
+        }
+        
+        // Format polynomial for display with factorial notation as fractions
+        function formatPolynomial(terms, lastCompletedIndex) {
+            if (terms.length === 0) return '0';
+            
+            let result = '';
+            let termCount = 0;
+            const isTrigOrExp = state.currentFunction && state.currentFunction.isTrig;
+            
+            for (let i = 0; i < terms.length; i++) {
+                const term = terms[i];
+                if (Math.abs(term.coefficient) < 0.00001) continue;
+                
+                const power = term.power;
+                
+                // For trig/exp functions, format with factorials; for polynomials, use decimals
+                let numerator, shouldUseFraction;
+                if (isTrigOrExp) {
+                    const factorial = factorialMemo(power);
+                    numerator = Math.round(term.coefficient * factorial);
+                    shouldUseFraction = (power > 0);
+                } else {
+                    numerator = term.coefficient;
+                    shouldUseFraction = false;
+                }
+                
+                if (Math.abs(numerator) < 0.00001) continue;
+                
+                // Check if this is the newly added term that should fade in
+                const isNewTerm = (i === lastCompletedIndex);
+                
+                // Wrapper for the entire term including sign
+                if (isNewTerm) {
+                    result += '<span style="opacity: 0; animation: termFadeIn 0.5s ease-out forwards; display: inline-block;">';
+                }
+                
+                // Sign
+                if (termCount === 0) {
+                    if (numerator < 0) result += '−';
+                } else {
+                    result += numerator > 0 ? ' &nbsp;+&nbsp; ' : ' &nbsp;−&nbsp; ';
+                }
+                
+                const absNumerator = Math.abs(numerator);
+                
+                // Build the term
+                if (power === 0) {
+                    // Constant term - always show as simple number
+                    if (isTrigOrExp) {
+                        result += absNumerator;
+                    } else {
+                        result += absNumerator.toFixed(2);
+                    }
+                } else {
+                    // All non-constant terms shown as fractions with n! denominator
+                    let numPart = '';
+                    
+                    if (isTrigOrExp) {
+                        // For trig/exp: coefficient is already factored out
+                        if (absNumerator !== 1) {
+                            numPart += absNumerator;
+                        }
+                    } else {
+                        // For polynomials: show actual coefficient * n!
+                        const factorial = factorialMemo(power);
+                        const scaledCoeff = (absNumerator * factorial).toFixed(2);
+                        numPart += scaledCoeff;
+                    }
+                    
+                    // Add variable and power
+                    if (power === 1) {
+                        numPart += 'x';
+                    } else {
+                        numPart += `x<sup>${power}</sup>`;
+                    }
+                    
+                    // Create fraction with n! denominator
+                    result += `<span class="fraction"><span class="numerator">${numPart}</span><span class="denominator">${power}!</span></span>`;
+                }
+                
+                if (isNewTerm) {
+                    result += '</span>';
+                }
+                
+                termCount++;
+            }
+            
+            return result || '0';
+        }
+        
+        // Initialize new function with random generation
+        function initNewFunction() {
+            // Pick a random function generator
+            const generator = functionGenerators[Math.floor(Math.random() * functionGenerators.length)];
+            const func = generator();
+            
+            // Pick two distinct random colors for this cycle
+            const shuffled = [...colorPalette].sort(() => Math.random() - 0.5);
+            state.currentColor = shuffled[0];
+            state.polynomialColor = shuffled[1];
+            
+            state.currentFunction = func;
+            state.terms = [];
+            state.currentTermIndex = 0;
+            state.timer = 0;
+            state.holdTimer = 0;
+            state.maxTerms = func.maxTerms;
+            state.xRangeMultiplier = func.xRangeMultiplier || 1;
+            state.lastCompletedTermIndex = -1;
+            
+            funcLabel.textContent = func.label;
+            funcLabel.style.color = state.currentColor;
+            polynomialDisplay.style.color = state.polynomialColor;
+            polynomialDisplay.innerHTML = '0';
+        }
+        
+        // Update polynomial display with fade-in effect
+        function updatePolynomialDisplay(lastCompletedIndex = -1) {
+            const html = formatPolynomial(state.terms, lastCompletedIndex);
+            polynomialDisplay.innerHTML = html;
+        }
+        
+        // Animation loop
+        let lastTime = 0;
+        
+        function animate(currentTime) {
+            const dt = currentTime - lastTime;
+            lastTime = currentTime;
+            
+            // Clear canvas
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Update state based on phase
+            if (state.animationPhase === 'fadingIn') {
+                state.timer += dt;
+                state.fadeAlpha = Math.min(1, state.timer / state.fadeDuration);
+                
+                if (state.fadeAlpha >= 1) {
+                    state.animationPhase = 'building';
+                    state.timer = 0;
+                }
+                
+                drawAxes();
+                if (state.currentFunction) {
+                    drawFunction(state.currentFunction.compute, state.currentColor, state.fadeAlpha);
+                }
+                
+            } else if (state.animationPhase === 'building') {
+                // Add or update current term
+                const targetCoeff = state.currentFunction.getCoefficient(state.currentTermIndex);
+                
+                // Skip zero terms instantly
+                if (Math.abs(targetCoeff) < 0.00001) {
+                    state.terms.push({
+                        coefficient: 0,
+                        power: state.currentTermIndex
+                    });
+                    state.currentTermIndex++;
+                    state.timer = 0;
+                    
+                    // Check if all terms are complete
+                    if (state.currentTermIndex >= state.maxTerms) {
+                        state.animationPhase = 'holding';
+                        state.holdTimer = 0;
+                    }
+                } else {
+                    // Animate non-zero terms
+                    state.timer += dt;
+                    const progress = Math.min(1, state.timer / state.termBuildDuration);
+                    const smoothProgress = smoothStep(progress);
+                    
+                    const currentCoeff = lerp(0, targetCoeff, smoothProgress);
+                    
+                    // Update terms array
+                    if (state.terms.length === state.currentTermIndex) {
+                        state.terms.push({
+                            coefficient: currentCoeff,
+                            power: state.currentTermIndex
+                        });
+                    } else {
+                        state.terms[state.currentTermIndex].coefficient = currentCoeff;
+                    }
+                    
+                    // Draw
+                    drawAxes();
+                    drawFunction(state.currentFunction.compute, state.currentColor);
+                    drawFunction(
+                        (x) => evaluateTaylorPolynomial(x, state.terms),
+                        state.polynomialColor
+                    );
+                    
+                    // Update display during animation
+                    updatePolynomialDisplay(-1);
+                    
+                    // Check if term is complete
+                    if (progress >= 1) {
+                        state.lastCompletedTermIndex = state.currentTermIndex;
+                        state.currentTermIndex++;
+                        state.timer = 0;
+                        
+                        // Trigger display update with fade animation
+                        setTimeout(() => {
+                            updatePolynomialDisplay(state.lastCompletedTermIndex);
+                        }, 10);
+                        
+                        // Check if all terms are complete
+                        if (state.currentTermIndex >= state.maxTerms) {
+                            state.animationPhase = 'holding';
+                            state.holdTimer = 0;
+                        }
+                    }
+                }
+                
+            } else if (state.animationPhase === 'holding') {
+                state.holdTimer += dt;
+                
+                drawAxes();
+                drawFunction(state.currentFunction.compute, state.currentColor);
+                drawFunction(
+                    (x) => evaluateTaylorPolynomial(x, state.terms),
+                    state.polynomialColor
+                );
+                
+                if (state.holdTimer >= state.holdDuration) {
+                    state.animationPhase = 'fadingOut';
+                    state.timer = 0;
+                }
+                
+            } else if (state.animationPhase === 'fadingOut') {
+                state.timer += dt;
+                state.fadeAlpha = Math.max(0, 1 - state.timer / state.fadeDuration);
+                
+                drawAxes();
+                drawFunction(state.currentFunction.compute, state.currentColor, state.fadeAlpha);
+                drawFunction(
+                    (x) => evaluateTaylorPolynomial(x, state.terms),
+                    state.polynomialColor,
+                    state.fadeAlpha
+                );
+                
+                if (state.fadeAlpha <= 0) {
+                    initNewFunction();
+                    state.animationPhase = 'fadingIn';
+                    state.timer = 0;
+                }
+            }
+            
+            requestAnimationFrame(animate);
+        }
+        
+        // Start animation
+        initNewFunction();
+        requestAnimationFrame(animate);
+    </script>
+</body>
+</html>
