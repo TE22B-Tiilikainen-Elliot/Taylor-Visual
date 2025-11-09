@@ -27,12 +27,13 @@
         
         #info {
             position: fixed;
-            top: 8%;
+            top: 5%;
             left: 0;
             right: 0;
             width: 100%;
             color: #fff;
             pointer-events: none;
+            padding: 0 2vw;
         }
         
         .polynomial-label {
@@ -40,38 +41,48 @@
             grid-template-columns: 1fr auto 1fr;
             align-items: center;
             width: 100%;
-            gap: 20px;
-            font-size: 24px;
+            gap: min(20px, 2vw);
+            font-size: clamp(14px, 2.5vw, 24px);
             font-weight: 600;
         }
         
         .function-label {
             font-weight: 700;
-            font-size: 28px;
+            font-size: clamp(16px, 3vw, 28px);
             text-shadow: 0 0 20px currentColor;
             transition: color 0.5s ease;
             text-align: right;
-            padding-right: 10px;
+            padding-right: min(10px, 1vw);
             display: flex;
             align-items: center;
             justify-content: flex-end;
+            white-space: nowrap;
         }
         
         .approx-symbol {
-            font-size: 32px;
+            font-size: clamp(20px, 3.5vw, 32px);
             font-weight: 400;
             text-align: center;
+            flex-shrink: 0;
         }
         
         .polynomial-content {
-            font-size: 24px;
-            letter-spacing: 1px;
+            font-size: clamp(14px, 2.5vw, 24px);
+            letter-spacing: 0.5px;
             text-shadow: 0 0 15px currentColor;
             text-align: left;
-            padding-left: 10px;
+            padding-left: min(10px, 1vw);
             display: flex;
             align-items: center;
-            word-spacing: 4px;
+            word-spacing: 2px;
+            overflow-x: auto;
+            overflow-y: hidden;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+        }
+        
+        .polynomial-content::-webkit-scrollbar {
+            display: none;
         }
         
         @keyframes termFadeIn {
@@ -88,17 +99,85 @@
             vertical-align: middle;
             text-align: center;
             font-size: 0.85em;
+            margin: 0 1px;
         }
         
         .fraction .numerator {
             display: block;
             border-bottom: 1px solid currentColor;
             padding-bottom: 2px;
+            line-height: 1.2;
         }
         
         .fraction .denominator {
             display: block;
             padding-top: 2px;
+            line-height: 1.2;
+        }
+        
+        /* Mobile optimizations */
+        @media (max-width: 768px) {
+            #info {
+                top: 3%;
+                padding: 0 4vw;
+            }
+            
+            .polynomial-label {
+                gap: 8px;
+                grid-template-columns: minmax(60px, 1fr) auto minmax(100px, 2fr);
+            }
+            
+            .function-label {
+                font-size: clamp(18px, 4.5vw, 24px);
+            }
+            
+            .polynomial-content {
+                font-size: clamp(16px, 4vw, 20px);
+                letter-spacing: 0.3px;
+                word-spacing: 1px;
+            }
+            
+            .fraction {
+                font-size: 0.8em;
+            }
+        }
+        
+        /* Very small mobile */
+        @media (max-width: 480px) {
+            #info {
+                top: 2%;
+            }
+            
+            .polynomial-label {
+                gap: 5px;
+            }
+            
+            .function-label {
+                padding-right: 5px;
+            }
+            
+            .polynomial-content {
+                padding-left: 5px;
+            }
+        }
+        
+        /* Landscape mobile */
+        @media (max-height: 500px) and (orientation: landscape) {
+            #info {
+                top: 2%;
+            }
+            
+            .polynomial-label {
+                font-size: clamp(12px, 2vw, 18px);
+            }
+            
+            .function-label {
+                font-size: clamp(14px, 2.5vw, 20px);
+            }
+            
+            .approx-symbol {
+                font-size: clamp(16px, 2.5vw, 24px);
+            }
         }
     </style>
 </head>
