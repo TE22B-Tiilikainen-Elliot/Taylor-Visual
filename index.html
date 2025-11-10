@@ -17,6 +17,7 @@
             overflow: hidden;
             background: #000;
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            cursor: pointer;
         }
         
         canvas {
@@ -67,14 +68,14 @@
         }
         
         .polynomial-content {
-            font-size: clamp(14px, 2.5vw, 24px);
-            letter-spacing: 0.5px;
+            font-size: clamp(12px, 2vw, 20px);
+            letter-spacing: 0px;
             text-shadow: 0 0 15px currentColor;
             text-align: left;
             padding-left: min(10px, 1vw);
             display: flex;
             align-items: center;
-            word-spacing: 2px;
+            word-spacing: 0px;
             overflow-x: auto;
             overflow-y: hidden;
             -webkit-overflow-scrolling: touch;
@@ -84,6 +85,80 @@
         .polynomial-content::-webkit-scrollbar {
             display: none;
         }
+        
+        .summation {
+            display: inline-flex;
+            flex-direction: column;
+            align-items: center;
+            font-size: 1.3em;
+            margin-right: 6px;
+            vertical-align: middle;
+            position: relative;
+            top: -2px;
+        }
+        
+        .summation .sum-limits {
+            font-size: 0.5em;
+            line-height: 1;
+        }
+        
+        .summation .sum-symbol {
+            font-size: 1.8em;
+            line-height: 0.8;
+        }
+        
+        #infiniteToggle {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            padding: 12px 16px;
+            color: #fff;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            pointer-events: auto;
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        
+        #infiniteToggle:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+        
+        .toggle-switch {
+            width: 40px;
+            height: 20px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            position: relative;
+            transition: background 0.3s;
+        }
+        
+        .toggle-switch.active {
+            background: #4ecdc4;
+        }
+        
+        .toggle-switch .slider {
+            width: 16px;
+            height: 16px;
+            background: #fff;
+            border-radius: 50%;
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            transition: transform 0.3s;
+        }
+        
+        .toggle-switch.active .slider {
+            transform: translateX(20px);
+        }
+        
         
         @keyframes termFadeIn {
             from {
@@ -98,8 +173,8 @@
             display: inline-block;
             vertical-align: middle;
             text-align: center;
-            font-size: 0.85em;
-            margin: 0 1px;
+            font-size: 0.8em;
+            margin: 0 2px;
         }
         
         .fraction .numerator {
@@ -187,7 +262,20 @@
         <div class="polynomial-label">
             <div class="function-label" id="funcLabel">sin(x)</div>
             <span class="approx-symbol">≈</span>
-            <div class="polynomial-content" id="polynomial"></div>
+            <div class="polynomial-content">
+                <span class="summation">
+                    <span class="sum-limits" id="sumUpper">∞</span>
+                    <span class="sum-symbol">Σ</span>
+                    <span class="sum-limits">n=<span id="sumLower">0</span></span>
+                </span>
+                <span id="polynomial">0</span>
+            </div>
+        </div>
+    </div>
+    <div id="infiniteToggle">
+        <span>Show ∞</span>
+        <div class="toggle-switch active">
+            <div class="slider"></div>
         </div>
     </div>
     
@@ -196,6 +284,10 @@
         const ctx = canvas.getContext('2d');
         const funcLabel = document.getElementById('funcLabel');
         const polynomialDisplay = document.getElementById('polynomial');
+        const sumLower = document.getElementById('sumLower');
+        const sumUpper = document.getElementById('sumUpper');
+        const infiniteToggle = document.getElementById('infiniteToggle');
+        let showInfinite = true;
         
         // Canvas setup
         function resizeCanvas() {
@@ -204,6 +296,22 @@
         }
         resizeCanvas();
         window.addEventListener('resize', resizeCanvas);
+        
+        // Click to skip
+        canvas.addEventListener('click', () => {
+            if (state.animationPhase !== 'fadingOut') {
+                state.animationPhase = 'fadingOut';
+                state.timer = 0;
+            }
+        });
+        
+        // Infinite toggle
+        infiniteToggle.addEventListener('click', (e) => {
+            e.stopPropagation();
+            showInfinite = !showInfinite;
+            infiniteToggle.querySelector('.toggle-switch').classList.toggle('active', showInfinite);
+            updateSummationDisplay();
+        });
         
         // Color palette
         const colorPalette = [
@@ -232,12 +340,25 @@
             timer: 0,
             holdTimer: 0,
             maxTerms: 10,
-            termBuildDuration: 1200, // ms to build each term
+            termBuildDuration: 1200, // ms to build each term (starting duration)
+            baseBuildDuration: 1200,
             holdDuration: 1500, // ms to hold completed polynomial
             fadeDuration: 800, // ms for fade transitions
             xRangeMultiplier: 1,
-            lastCompletedTermIndex: -1
+            lastCompletedTermIndex: -1,
+            currentSumIndex: 0
         };
+        
+        // Update summation notation display
+        function updateSummationDisplay() {
+            sumLower.textContent = state.currentSumIndex;
+            const isInfiniteSeries = state.currentFunction && state.currentFunction.isInfinite;
+            if ((showInfinite && isInfiniteSeries) || state.animationPhase !== 'holding') {
+                sumUpper.textContent = '∞';
+            } else {
+                sumUpper.textContent = state.maxTerms - 1;
+            }
+        }
         
         // Generate random polynomial function
         function generateRandomPolynomial() {
@@ -268,47 +389,98 @@
                 },
                 maxTerms: degree + 1,
                 xRangeMultiplier: xRange,
-                isTrig: false
+                isTrig: false,
+                isInfinite: false
             };
         }
         
         // Function definitions with Taylor series coefficients
         const functionGenerators = [
-            () => ({
-                label: 'sin(x)',
-                compute: (x) => Math.sin(x),
-                getCoefficient: (n) => {
-                    if (n % 2 === 0) return 0;
-                    const sign = Math.pow(-1, (n - 1) / 2);
-                    return sign / factorialMemo(n);
-                },
-                maxTerms: 25,
-                xRangeMultiplier: 2 + Math.random() * 2,
-                isTrig: true
-            }),
-            () => ({
-                label: 'cos(x)',
-                compute: (x) => Math.cos(x),
-                getCoefficient: (n) => {
-                    if (n % 2 === 1) return 0;
-                    const sign = Math.pow(-1, n / 2);
-                    return sign / factorialMemo(n);
-                },
-                maxTerms: 25,
-                xRangeMultiplier: 2 + Math.random() * 2,
-                isTrig: true
-            }),
+            () => {
+                const xMult = 2 + Math.random() * 2;
+                const maxX = Math.PI * xMult;
+                // Calculate terms needed for very high accuracy
+                const termsNeeded = Math.ceil(maxX * 2.5) + 10;
+                return {
+                    label: 'sin(x)',
+                    compute: (x) => Math.sin(x),
+                    getCoefficient: (n) => {
+                        if (n % 2 === 0) return 0;
+                        const sign = Math.pow(-1, (n - 1) / 2);
+                        return sign / factorialMemo(n);
+                    },
+                    maxTerms: termsNeeded,
+                    xRangeMultiplier: xMult,
+                    isTrig: true,
+                    isInfinite: true
+                };
+            },
+            () => {
+                const xMult = 2 + Math.random() * 2;
+                const maxX = Math.PI * xMult;
+                const termsNeeded = Math.ceil(maxX * 2.5) + 10;
+                return {
+                    label: 'cos(x)',
+                    compute: (x) => Math.cos(x),
+                    getCoefficient: (n) => {
+                        if (n % 2 === 1) return 0;
+                        const sign = Math.pow(-1, n / 2);
+                        return sign / factorialMemo(n);
+                    },
+                    maxTerms: termsNeeded,
+                    xRangeMultiplier: xMult,
+                    isTrig: true,
+                    isInfinite: true
+                };
+            },
             () => ({
                 label: 'e^x',
                 compute: (x) => Math.exp(x),
                 getCoefficient: (n) => {
                     return 1 / factorialMemo(n);
                 },
-                maxTerms: 10,
+                maxTerms: 15,
                 xRangeMultiplier: 1,
-                isTrig: false
+                isTrig: false,
+                isInfinite: true
             }),
-            generateRandomPolynomial,
+            () => {
+                const termsNeeded = 35;
+                return {
+                    label: 'arctan(x)',
+                    compute: (x) => Math.atan(x),
+                    getCoefficient: (n) => {
+                        // arctan: x - x^3/3 + x^5/5 - x^7/7 + ...
+                        if (n % 2 === 0) return 0;
+                        const sign = Math.pow(-1, (n - 1) / 2);
+                        return sign / n;
+                    },
+                    maxTerms: termsNeeded,
+                    xRangeMultiplier: 1,
+                    isTrig: true,
+                    isInfinite: true
+                };
+            },
+            () => {
+                const termsNeeded = 30;
+                return {
+                    label: 'ln(1+x)',
+                    compute: (x) => {
+                        if (x <= -1) return NaN;
+                        return Math.log(1 + x);
+                    },
+                    getCoefficient: (n) => {
+                        // ln(1+x): x - x^2/2 + x^3/3 - x^4/4 + ...
+                        if (n === 0) return 0;
+                        const sign = Math.pow(-1, n + 1);
+                        return sign / n;
+                    },
+                    maxTerms: termsNeeded,
+                    xRangeMultiplier: 0.8,
+                    isTrig: true,
+                    isInfinite: true
+                };
+            },
             generateRandomPolynomial,
             generateRandomPolynomial
         ];
@@ -358,19 +530,48 @@
             ctx.strokeStyle = '#555';
             ctx.lineWidth = 1.5;
             
-            // X-axis
+            const xRange = Math.PI * state.xRangeMultiplier;
             const y0 = worldToScreen(0, 0).y;
+            const x0 = worldToScreen(0, 0).x;
+            
+            // X-axis
             ctx.beginPath();
             ctx.moveTo(0, y0);
             ctx.lineTo(canvas.width, y0);
             ctx.stroke();
             
             // Y-axis
-            const x0 = worldToScreen(0, 0).x;
             ctx.beginPath();
             ctx.moveTo(x0, 0);
             ctx.lineTo(x0, canvas.height);
             ctx.stroke();
+            
+            // Draw tick marks
+            ctx.strokeStyle = '#666';
+            ctx.lineWidth = 1;
+            const tickSize = 8;
+            
+            // X-axis ticks (every π/2 or similar)
+            const xTickInterval = Math.PI / 2;
+            for (let x = -xRange; x <= xRange; x += xTickInterval) {
+                if (Math.abs(x) < 0.01) continue; // Skip origin
+                const screen = worldToScreen(x, 0);
+                ctx.beginPath();
+                ctx.moveTo(screen.x, screen.y - tickSize / 2);
+                ctx.lineTo(screen.x, screen.y + tickSize / 2);
+                ctx.stroke();
+            }
+            
+            // Y-axis ticks (every 1 unit)
+            const yTickInterval = 1;
+            for (let y = -3; y <= 3; y += yTickInterval) {
+                if (Math.abs(y) < 0.01) continue; // Skip origin
+                const screen = worldToScreen(0, y);
+                ctx.beginPath();
+                ctx.moveTo(screen.x - tickSize / 2, screen.y);
+                ctx.lineTo(screen.x + tickSize / 2, screen.y);
+                ctx.stroke();
+            }
         }
         
         function drawFunction(func, color, alpha = 1) {
@@ -398,6 +599,36 @@
             }
             
             ctx.stroke();
+            ctx.globalAlpha = 1;
+        }
+        
+        // Draw error visualization (vertical bars)
+        function drawErrorBars() {
+            if (state.terms.length === 0 || state.animationPhase === 'fadingIn' || state.animationPhase === 'fadingOut') return;
+            
+            const xRange = Math.PI * state.xRangeMultiplier;
+            const step = (2 * xRange) / 30; // Sample 30 points
+            
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+            ctx.lineWidth = 1;
+            ctx.globalAlpha = 0.5;
+            
+            for (let x = -xRange; x <= xRange; x += step) {
+                const targetY = state.currentFunction.compute(x);
+                const approxY = evaluateTaylorPolynomial(x, state.terms);
+                
+                if (!isFinite(targetY) || !isFinite(approxY)) continue;
+                if (Math.abs(targetY) > 100 || Math.abs(approxY) > 100) continue;
+                
+                const screen1 = worldToScreen(x, targetY);
+                const screen2 = worldToScreen(x, approxY);
+                
+                ctx.beginPath();
+                ctx.moveTo(screen1.x, screen1.y);
+                ctx.lineTo(screen2.x, screen2.y);
+                ctx.stroke();
+            }
+            
             ctx.globalAlpha = 1;
         }
         
@@ -449,7 +680,7 @@
                 if (termCount === 0) {
                     if (numerator < 0) result += '−';
                 } else {
-                    result += numerator > 0 ? ' &nbsp;+&nbsp; ' : ' &nbsp;−&nbsp; ';
+                    result += numerator > 0 ? ' + ' : ' − ';
                 }
                 
                 const absNumerator = Math.abs(numerator);
@@ -518,11 +749,14 @@
             state.maxTerms = func.maxTerms;
             state.xRangeMultiplier = func.xRangeMultiplier || 1;
             state.lastCompletedTermIndex = -1;
+            state.currentSumIndex = 0;
+            state.termBuildDuration = state.baseBuildDuration;
             
             funcLabel.textContent = func.label;
             funcLabel.style.color = state.currentColor;
             polynomialDisplay.style.color = state.polynomialColor;
             polynomialDisplay.innerHTML = '0';
+            updateSummationDisplay();
         }
         
         // Update polynomial display with fade-in effect
@@ -570,6 +804,15 @@
                     state.currentTermIndex++;
                     state.timer = 0;
                     
+                    // Still draw during zero term skip to prevent blink
+                    drawAxes();
+                    drawErrorBars();
+                    drawFunction(state.currentFunction.compute, state.currentColor);
+                    drawFunction(
+                        (x) => evaluateTaylorPolynomial(x, state.terms),
+                        state.polynomialColor
+                    );
+                    
                     // Check if all terms are complete
                     if (state.currentTermIndex >= state.maxTerms) {
                         state.animationPhase = 'holding';
@@ -595,6 +838,7 @@
                     
                     // Draw
                     drawAxes();
+                    drawErrorBars();
                     drawFunction(state.currentFunction.compute, state.currentColor);
                     drawFunction(
                         (x) => evaluateTaylorPolynomial(x, state.terms),
@@ -604,21 +848,41 @@
                     // Update display during animation
                     updatePolynomialDisplay(-1);
                     
+                    // Update sum index for non-zero terms
+                    if (Math.abs(targetCoeff) > 0.00001) {
+                        state.currentSumIndex = state.currentTermIndex;
+                        updateSummationDisplay();
+                    }
+                    
                     // Check if term is complete
                     if (progress >= 1) {
                         state.lastCompletedTermIndex = state.currentTermIndex;
                         state.currentTermIndex++;
                         state.timer = 0;
                         
+                        // Calculate exponential speed increase for NEXT term
+                        const speedupStart = 4;
+                        const speedupFactor = 0.92;
+                        if (state.currentTermIndex > speedupStart) {
+                            const termsAfterSpeedup = state.currentTermIndex - speedupStart;
+                            state.termBuildDuration = state.baseBuildDuration * Math.pow(speedupFactor, termsAfterSpeedup);
+                            state.termBuildDuration = Math.max(state.termBuildDuration, 50);
+                        }
+                        
                         // Trigger display update with fade animation
                         setTimeout(() => {
                             updatePolynomialDisplay(state.lastCompletedTermIndex);
                         }, 10);
                         
+                        // Update sum index
+                        state.currentSumIndex = state.currentTermIndex;
+                        updateSummationDisplay();
+                        
                         // Check if all terms are complete
                         if (state.currentTermIndex >= state.maxTerms) {
                             state.animationPhase = 'holding';
                             state.holdTimer = 0;
+                            updateSummationDisplay();
                         }
                     }
                 }
@@ -627,6 +891,7 @@
                 state.holdTimer += dt;
                 
                 drawAxes();
+                drawErrorBars();
                 drawFunction(state.currentFunction.compute, state.currentColor);
                 drawFunction(
                     (x) => evaluateTaylorPolynomial(x, state.terms),
