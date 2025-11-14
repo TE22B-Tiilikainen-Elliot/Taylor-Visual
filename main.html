@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mathematical Approximations</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background: #000;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            color: #fff;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 40px 20px;
+            overflow-y: auto;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 60px;
+            width: 100%;
+            max-width: 1200px;
+        }
+        
+        .header h1 {
+            font-size: clamp(32px, 6vw, 56px);
+            font-weight: 700;
+            margin-bottom: 15px;
+            background: linear-gradient(135deg, #00ffff, #ff00ff, #00ff88);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .header p {
+            font-size: clamp(14px, 2vw, 18px);
+            color: rgba(255, 255, 255, 0.6);
+        }
+        
+        
+        .methods-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 30px;
+            width: 100%;
+            max-width: 1200px;
+            margin-bottom: 40px;
+        }
+        
+        .method-card {
+            background: rgba(255, 255, 255, 0.03);
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 30px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+            backdrop-filter: blur(10px);
+        }
+        
+        .method-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, transparent, rgba(255, 255, 255, 0.05));
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        
+        .method-card:hover {
+            transform: translateY(-8px);
+            border-color: var(--card-color);
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5), 0 0 30px var(--card-color-alpha);
+        }
+        
+        .method-card:hover::before {
+            opacity: 1;
+        }
+        
+        .method-card.taylor {
+            --card-color: #00ffff;
+            --card-color-alpha: rgba(0, 255, 255, 0.2);
+        }
+        
+        .method-card.arc-length {
+            --card-color: #ff00ff;
+            --card-color-alpha: rgba(255, 0, 255, 0.2);
+        }
+        
+        .method-card.riemann {
+            --card-color: #00ff88;
+            --card-color-alpha: rgba(0, 255, 136, 0.2);
+        }
+        
+        .method-card.newton {
+            --card-color: #ff6b6b;
+            --card-color-alpha: rgba(255, 107, 107, 0.2);
+        }
+        
+        .method-card.fourier {
+            --card-color: #ffd93d;
+            --card-color-alpha: rgba(255, 217, 61, 0.2);
+        }
+        
+        .method-card.euler {
+            --card-color: #8b5cf6;
+            --card-color-alpha: rgba(139, 92, 246, 0.2);
+        }
+        
+        .method-title {
+            font-size: clamp(22px, 3vw, 28px);
+            font-weight: 700;
+            margin-bottom: 15px;
+            color: var(--card-color);
+            text-shadow: 0 0 10px var(--card-color-alpha);
+        }
+        
+        .method-description {
+            font-size: clamp(13px, 1.8vw, 15px);
+            color: rgba(255, 255, 255, 0.7);
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }
+        
+        .method-preview {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            min-height: 120px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        
+        .method-preview canvas {
+            width: 100%;
+            height: 100px;
+            border-radius: 8px;
+        }
+        
+        .formula-container {
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 12px;
+            padding: 18px;
+            border: 1px solid var(--card-color);
+            box-shadow: 0 0 15px var(--card-color-alpha);
+        }
+        
+        .formula {
+            font-size: clamp(15px, 2vw, 18px);
+            text-align: center;
+            color: #fff;
+            letter-spacing: 0.5px;
+        }
+        
+        .fraction {
+            display: inline-block;
+            vertical-align: middle;
+            text-align: center;
+            margin: 0 3px;
+        }
+        
+        .fraction .numerator {
+            display: block;
+            border-bottom: 1px solid currentColor;
+            padding-bottom: 3px;
+            line-height: 1.3;
+        }
+        
+        .fraction .denominator {
+            display: block;
+            padding-top: 3px;
+            line-height: 1.3;
+        }
+        
+        .summation {
+            display: inline-flex;
+            flex-direction: column;
+            align-items: center;
+            font-size: 1.4em;
+            margin: 0 6px;
+            vertical-align: middle;
+        }
+        
+        .summation .sum-limits {
+            font-size: 0.5em;
+            line-height: 1;
+        }
+        
+        .summation .sum-symbol {
+            font-size: 1.8em;
+            line-height: 0.8;
+        }
+        
+        .integral {
+            display: inline-flex;
+            flex-direction: column;
+            align-items: center;
+            font-size: 1.6em;
+            margin: 0 4px;
+            vertical-align: middle;
+            position: relative;
+        }
+        
+        .integral .int-limits {
+            font-size: 0.45em;
+            line-height: 1;
+            position: absolute;
+        }
+        
+        .integral .int-limits.upper {
+            top: -8px;
+            right: -8px;
+        }
+        
+        .integral .int-limits.lower {
+            bottom: -8px;
+            right: -8px;
+        }
+        
+        .integral .int-symbol {
+            font-size: 2em;
+            line-height: 0.9;
+        }
+        
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .methods-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .header {
+                margin-bottom: 40px;
+            }
+            
+            .method-card {
+                padding: 25px;
+            }
+        }
+        
+        /* Animation */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .method-card {
+            animation: fadeInUp 0.6s ease-out backwards;
+        }
+        
+        .method-card:nth-child(1) { animation-delay: 0.1s; }
+        .method-card:nth-child(2) { animation-delay: 0.2s; }
+        .method-card:nth-child(3) { animation-delay: 0.3s; }
+        .method-card:nth-child(4) { animation-delay: 0.4s; }
+        .method-card:nth-child(5) { animation-delay: 0.5s; }
+        .method-card:nth-child(6) { animation-delay: 0.6s; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Mathematical Approximations</h1>
+        <p>Explore different methods for approximating functions and calculations</p>
+    </div>
+    
+    <div class="methods-grid">
+        <!-- Taylor Series -->
+        <div class="method-card taylor" onclick="navigateTo('index.html')">
+            <h2 class="method-title">Taylor Series</h2>
+            <p class="method-description">
+                Approximate functions using infinite sums of polynomial terms centered around a point.
+            </p>
+            <div class="method-preview">
+                <canvas id="taylorPreview"></canvas>
+            </div>
+            <div class="formula-container">
+                <div class="formula">
+                    f(x) ≈ 
+                    <span class="summation">
+                        <span class="sum-limits">∞</span>
+                        <span class="sum-symbol">Σ</span>
+                        <span class="sum-limits">n=0</span>
+                    </span>
+                    <span class="fraction">
+                        <span class="numerator">f<sup>(n)</sup>(a)(x−a)<sup>n</sup></span>
+                        <span class="denominator">n!</span>
+                    </span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Arc Length -->
+        <div class="method-card arc-length" onclick="navigateTo('index.html', 2)">
+            <h2 class="method-title">Arc Length</h2>
+            <p class="method-description">
+                Calculate the length of a curve using linear segment approximations.
+            </p>
+            <div class="method-preview">
+                <canvas id="arcPreview"></canvas>
+            </div>
+            <div class="formula-container">
+                <div class="formula">
+                    L = 
+                    <span class="integral">
+                        <span class="int-limits upper">b</span>
+                        <span class="int-symbol">∫</span>
+                        <span class="int-limits lower">a</span>
+                    </span>
+                    √(1 + [f'(x)]²) dx
+                </div>
+            </div>
+        </div>
+        
+        <!-- Riemann Sums -->
+        <div class="method-card riemann" onclick="alert('Coming soon!')">
+            <h2 class="method-title">Riemann Sums</h2>
+            <p class="method-description">
+                Approximate definite integrals using rectangular area approximations.
+            </p>
+            <div class="method-preview">
+                <canvas id="riemannPreview"></canvas>
+            </div>
+            <div class="formula-container">
+                <div class="formula">
+                    <span class="integral">
+                        <span class="int-limits upper">b</span>
+                        <span class="int-symbol">∫</span>
+                        <span class="int-limits lower">a</span>
+                    </span>
+                    f(x) dx ≈ 
+                    <span class="summation">
+                        <span class="sum-limits">n</span>
+                        <span class="sum-symbol">Σ</span>
+                        <span class="sum-limits">i=1</span>
+                    </span>
+                    f(x<sub>i</sub>)Δx
+                </div>
+            </div>
+        </div>
+        
+        <!-- Newton's Method -->
+        <div class="method-card newton" onclick="alert('Coming soon!')">
+            <h2 class="method-title">Newton's Method</h2>
+            <p class="method-description">
+                Find roots of equations using iterative tangent line approximations.
+            </p>
+            <div class="method-preview">
+                <canvas id="newtonPreview"></canvas>
+            </div>
+            <div class="formula-container">
+                <div class="formula">
+                    x<sub>n+1</sub> = x<sub>n</sub> − 
+                    <span class="fraction">
+                        <span class="numerator">f(x<sub>n</sub>)</span>
+                        <span class="denominator">f'(x<sub>n</sub>)</span>
+                    </span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Fourier Series -->
+        <div class="method-card fourier" onclick="alert('Coming soon!')">
+            <h2 class="method-title">Fourier Series</h2>
+            <p class="method-description">
+                Decompose periodic functions into sums of sine and cosine waves.
+            </p>
+            <div class="method-preview">
+                <canvas id="fourierPreview"></canvas>
+            </div>
+            <div class="formula-container">
+                <div class="formula">
+                    f(x) = a₀ + 
+                    <span class="summation">
+                        <span class="sum-limits">∞</span>
+                        <span class="sum-symbol">Σ</span>
+                        <span class="sum-limits">n=1</span>
+                    </span>
+                    [a<sub>n</sub>cos(nx) + b<sub>n</sub>sin(nx)]
+                </div>
+            </div>
+        </div>
+        
+        <!-- Euler's Method -->
+        <div class="method-card euler" onclick="alert('Coming soon!')">
+            <h2 class="method-title">Euler's Method</h2>
+            <p class="method-description">
+                Numerically solve differential equations using tangent line steps.
+            </p>
+            <div class="method-preview">
+                <canvas id="eulerPreview"></canvas>
+            </div>
+            <div class="formula-container">
+                <div class="formula">
+                    y<sub>n+1</sub> = y<sub>n</sub> + hf(x<sub>n</sub>, y<sub>n</sub>)
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Navigation function
+        function navigateTo(page, pageNumber = 1) {
+            // Add page parameter to URL if specified
+            if (pageNumber > 1) {
+                window.location.href = page + '?page=' + pageNumber;
+            } else {
+                window.location.href = page;
+            }
+        }
+        
+        // Preview canvas setup
+        function setupPreviewCanvas(canvasId, drawFunction) {
+            const canvas = document.getElementById(canvasId);
+            if (!canvas) return;
+            
+            const ctx = canvas.getContext('2d');
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = canvas.offsetWidth * dpr;
+            canvas.height = canvas.offsetHeight * dpr;
+            ctx.scale(dpr, dpr);
+            
+            drawFunction(ctx, canvas.offsetWidth, canvas.offsetHeight);
+        }
+        
+        // Draw Taylor preview (sine wave with polynomial)
+        setupPreviewCanvas('taylorPreview', (ctx, w, h) => {
+            const centerY = h / 2;
+            const amplitude = h * 0.35;
+            
+            // Draw sine wave
+            ctx.strokeStyle = '#00ffff';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            for (let x = 0; x <= w; x += 2) {
+                const t = (x / w) * Math.PI * 2;
+                const y = centerY + Math.sin(t) * amplitude;
+                if (x === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+            
+            // Draw polynomial approximation
+            ctx.strokeStyle = 'rgba(255, 255, 0, 0.7)';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            for (let x = 0; x <= w; x += 2) {
+                const t = ((x / w) - 0.5) * Math.PI * 2;
+                const y = centerY - (t - Math.pow(t, 3) / 6) * amplitude;
+                if (x === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+        });
+        
+        // Draw Arc Length preview
+        setupPreviewCanvas('arcPreview', (ctx, w, h) => {
+            const centerY = h / 2;
+            const amplitude = h * 0.35;
+            
+            // Draw curve
+            ctx.strokeStyle = '#ff00ff';
+            ctx.lineWidth = 2.5;
+            ctx.beginPath();
+            for (let x = 0; x <= w; x += 2) {
+                const t = (x / w) * Math.PI * 1.5;
+                const y = centerY + Math.sin(t) * amplitude;
+                if (x === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+            
+            // Draw line segments
+            ctx.strokeStyle = 'rgba(255, 255, 0, 0.6)';
+            ctx.lineWidth = 1.5;
+            const segments = 8;
+            for (let i = 0; i < segments; i++) {
+                const x1 = (i / segments) * w;
+                const x2 = ((i + 1) / segments) * w;
+                const t1 = (i / segments) * Math.PI * 1.5;
+                const t2 = ((i + 1) / segments) * Math.PI * 1.5;
+                const y1 = centerY + Math.sin(t1) * amplitude;
+                const y2 = centerY + Math.sin(t2) * amplitude;
+                
+                ctx.beginPath();
+                ctx.moveTo(x1, y1);
+                ctx.lineTo(x2, y2);
+                ctx.stroke();
+                
+                // Draw dots
+                ctx.fillStyle = '#ff00ff';
+                ctx.beginPath();
+                ctx.arc(x1, y1, 3, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        });
+        
+        // Draw Riemann preview
+        setupPreviewCanvas('riemannPreview', (ctx, w, h) => {
+            const centerY = h * 0.85;
+            const amplitude = h * 0.5;
+            
+            // Draw curve
+            ctx.strokeStyle = '#00ff88';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            for (let x = 0; x <= w; x += 2) {
+                const t = (x / w) * Math.PI;
+                const y = centerY - Math.sin(t) * amplitude;
+                if (x === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+            
+            // Draw rectangles
+            ctx.fillStyle = 'rgba(0, 255, 136, 0.3)';
+            ctx.strokeStyle = 'rgba(0, 255, 136, 0.6)';
+            ctx.lineWidth = 1;
+            const rects = 6;
+            for (let i = 0; i < rects; i++) {
+                const x = (i / rects) * w;
+                const rectW = w / rects;
+                const t = ((i + 0.5) / rects) * Math.PI;
+                const rectH = Math.sin(t) * amplitude;
+                ctx.fillRect(x, centerY - rectH, rectW, rectH);
+                ctx.strokeRect(x, centerY - rectH, rectW, rectH);
+            }
+        });
+        
+        // Draw Newton preview
+        setupPreviewCanvas('newtonPreview', (ctx, w, h) => {
+            const centerY = h / 2;
+            const amplitude = h * 0.4;
+            
+            // Draw parabola
+            ctx.strokeStyle = '#ff6b6b';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            for (let x = 0; x <= w; x += 2) {
+                const t = ((x / w) - 0.5) * 4;
+                const y = centerY - (t * t - 1) * amplitude * 0.3;
+                if (x === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+            
+            // Draw tangent lines
+            ctx.strokeStyle = 'rgba(255, 255, 0, 0.5)';
+            ctx.lineWidth = 1.5;
+            const points = [0.7, 0.55, 0.51];
+            points.forEach(px => {
+                const x = px * w;
+                const t = (px - 0.5) * 4;
+                const y = centerY - (t * t - 1) * amplitude * 0.3;
+                
+                // Draw tangent line
+                ctx.beginPath();
+                ctx.moveTo(x - 30, y - 60);
+                ctx.lineTo(x + 30, y + 60);
+                ctx.stroke();
+                
+                // Draw point
+                ctx.fillStyle = '#ff6b6b';
+                ctx.beginPath();
+                ctx.arc(x, y, 3, 0, Math.PI * 2);
+                ctx.fill();
+            });
+        });
+        
+        // Draw Fourier preview
+        setupPreviewCanvas('fourierPreview', (ctx, w, h) => {
+            const centerY = h / 2;
+            const amplitude = h * 0.35;
+            
+            // Draw square wave approximation
+            ctx.strokeStyle = '#ffd93d';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            for (let x = 0; x <= w; x += 1) {
+                const t = (x / w) * Math.PI * 2;
+                let y = 0;
+                // Sum first few Fourier terms
+                for (let n = 1; n <= 7; n += 2) {
+                    y += (1 / n) * Math.sin(n * t);
+                }
+                y = centerY + y * amplitude;
+                if (x === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+            
+            // Draw target square wave (dashed)
+            ctx.strokeStyle = 'rgba(255, 217, 61, 0.4)';
+            ctx.setLineDash([5, 5]);
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            for (let x = 0; x <= w; x += 2) {
+                const t = (x / w) * Math.PI * 2;
+                const y = centerY + (Math.sin(t) > 0 ? amplitude : -amplitude);
+                if (x === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+            ctx.setLineDash([]);
+        });
+        
+        // Draw Euler preview
+        setupPreviewCanvas('eulerPreview', (ctx, w, h) => {
+            const startX = w * 0.1;
+            const startY = h * 0.8;
+            
+            // Draw exponential curve
+            ctx.strokeStyle = '#8b5cf6';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            for (let x = 0; x <= w * 0.9; x += 2) {
+                const t = (x / w) * 3;
+                const y = startY - Math.exp(t * 0.5) * h * 0.1;
+                if (x === 0) ctx.moveTo(startX + x, y);
+                else ctx.lineTo(startX + x, y);
+            }
+            ctx.stroke();
+            
+            // Draw Euler steps
+            ctx.strokeStyle = 'rgba(255, 255, 0, 0.6)';
+            ctx.lineWidth = 1.5;
+            let x = 0, y = startY;
+            const steps = 8;
+            const stepSize = (w * 0.9) / steps;
+            
+            for (let i = 0; i < steps; i++) {
+                const t = (x / w) * 3;
+                const slope = 0.5 * Math.exp(t * 0.5) * h * 0.1;
+                const newX = x + stepSize;
+                const newY = y - slope * (stepSize / w) * 3;
+                
+                ctx.beginPath();
+                ctx.moveTo(startX + x, y);
+                ctx.lineTo(startX + newX, newY);
+                ctx.stroke();
+                
+                // Draw point
+                ctx.fillStyle = '#8b5cf6';
+                ctx.beginPath();
+                ctx.arc(startX + x, y, 2.5, 0, Math.PI * 2);
+                ctx.fill();
+                
+                x = newX;
+                y = newY;
+            }
+        });
+        
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            setupPreviewCanvas('taylorPreview', arguments.callee);
+            // Re-setup all other previews...
+        });
+    </script>
+</body>
+</html>

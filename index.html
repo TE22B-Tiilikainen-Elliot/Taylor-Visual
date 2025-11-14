@@ -18,12 +18,87 @@
             background: #000;
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
             cursor: pointer;
+            touch-action: pan-y;
         }
         
         canvas {
             display: block;
             width: 100%;
             height: 100vh;
+        }
+        
+        .page-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100vh;
+            transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            will-change: transform;
+        }
+        
+        #page1 {
+            transform: translateX(0);
+            z-index: 10;
+        }
+        
+        #page2 {
+            transform: translateX(100%);
+            z-index: 9;
+        }
+        
+        .page-container.slide-left {
+            transform: translateX(-100%) !important;
+        }
+        
+        .page-container.slide-right {
+            transform: translateX(100%) !important;
+        }
+        
+        .page-container.active {
+            transform: translateX(0) !important;
+            z-index: 10;
+        }
+        
+        .nav-hint {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            color: rgba(255, 255, 255, 0.4);
+            font-size: 14px;
+            pointer-events: none;
+            z-index: 1000;
+        }
+        
+        .back-button {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            width: 50px;
+            height: 50px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 2px solid rgba(0, 255, 255, 0.3);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 1000;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+            text-decoration: none;
+            color: #00ffff;
+            font-size: 32px;
+            font-weight: 300;
+            line-height: 1;
+            padding-bottom: 2px;
+        }
+        
+        .back-button:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: #00ffff;
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.3);
+            transform: scale(1.1);
         }
         
         #info {
@@ -206,8 +281,11 @@
     </style>
 </head>
 <body>
-    <canvas id="canvas"></canvas>
-    <div id="info">
+    <a href="main.html" class="back-button" title="Back to main page">×</a>
+    
+    <div class="page-container active" id="page1">
+        <canvas id="canvas"></canvas>
+        <div id="info">
         <div class="polynomial-label">
             <div class="function-label" id="funcLabel">sin(x)</div>
             <span class="approx-symbol">≈</span>
@@ -220,9 +298,133 @@
                 <span id="polynomial">0</span>
             </div>
         </div>
+        </div>
     </div>
     
+    <div class="page-container" id="page2">
+        <canvas id="canvas2"></canvas>
+        <div id="info">
+            <div class="polynomial-label">
+                <div class="function-label" id="funcLabel2">Arc Length</div>
+                <span class="approx-symbol">≈</span>
+                <div class="polynomial-content">
+                    <span id="arcLength">0</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="nav-hint">← → to navigate</div>
+    
     <script>
+        // Check URL parameters for initial page
+        const urlParams = new URLSearchParams(window.location.search);
+        const initialPage = parseInt(urlParams.get('page')) || 1;
+        console.log('Initial page from URL:', initialPage);
+        
+        // Page navigation
+        let currentPage = initialPage;
+        const page1 = document.getElementById('page1');
+        const page2 = document.getElementById('page2');
+        
+        function navigateToPage(pageNum) {
+            if (pageNum === currentPage) return;
+            
+            console.log('Navigating to page', pageNum);
+            currentPage = pageNum;
+            
+            if (pageNum === 1) {
+                page1.classList.remove('slide-left');
+                page1.classList.add('active');
+                page2.classList.remove('active');
+                page2.classList.add('slide-right');
+            } else if (pageNum === 2) {
+                page1.classList.remove('active');
+                page1.classList.add('slide-left');
+                page2.classList.remove('slide-right');
+                page2.classList.add('active');
+            }
+        }
+        
+        // Keyboard navigation
+        document.addEventListener('keydown', (e) => {
+            console.log('Key pressed:', e.key);
+            if (e.key === 'ArrowRight') {
+                e.preventDefault();
+                navigateToPage(2);
+            } else if (e.key === 'ArrowLeft') {
+                e.preventDefault();
+                navigateToPage(1);
+            }
+        });
+        
+        // Touch/swipe navigation
+        let touchStartX = 0;
+        let touchEndX = 0;
+        
+        document.addEventListener('touchstart', (e) => {
+            touchStartX = e.changedTouches[0].screenX;
+        });
+        
+        document.addEventListener('touchend', (e) => {
+            touchEndX = e.changedTouches[0].screenX;
+            handleSwipe();
+        });
+        
+        // Mouse swipe for PC
+        let mouseDown = false;
+        let mouseStartX = 0;
+        let didSwipe = false;
+        
+        document.addEventListener('mousedown', (e) => {
+            mouseDown = true;
+            mouseStartX = e.clientX;
+            didSwipe = false;
+        });
+        
+        document.addEventListener('mousemove', (e) => {
+            if (mouseDown) {
+                const diff = Math.abs(e.clientX - mouseStartX);
+                if (diff > 30) {
+                    didSwipe = true;
+                }
+            }
+        });
+        
+        document.addEventListener('mouseup', (e) => {
+            if (mouseDown) {
+                const mouseEndX = e.clientX;
+                const diff = mouseStartX - mouseEndX;
+                
+                console.log('Mouse drag diff:', diff);
+                
+                if (Math.abs(diff) > 50) {
+                    didSwipe = true;
+                    if (diff > 0) {
+                        console.log('Swiping right -> page 2');
+                        navigateToPage(2);
+                    } else {
+                        console.log('Swiping left -> page 1');
+                        navigateToPage(1);
+                    }
+                }
+            }
+            mouseDown = false;
+        });
+        
+        function handleSwipe() {
+            const diff = touchStartX - touchEndX;
+            
+            if (Math.abs(diff) > 50) {
+                if (diff > 0) {
+                    navigateToPage(2);
+                } else {
+                    navigateToPage(1);
+                }
+            }
+        }
+        
+        // Page 1 (Taylor Polynomial)
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
         const funcLabel = document.getElementById('funcLabel');
@@ -230,19 +432,35 @@
         const sumLower = document.getElementById('sumLower');
         const sumUpper = document.getElementById('sumUpper');
         
+        // Page 2 (Arc Length)
+        const canvas2 = document.getElementById('canvas2');
+        const ctx2 = canvas2.getContext('2d');
+        const funcLabel2 = document.getElementById('funcLabel2');
+        const arcLengthDisplay = document.getElementById('arcLength');
+        
         // Canvas setup
         function resizeCanvas() {
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
+            canvas2.width = window.innerWidth;
+            canvas2.height = window.innerHeight;
         }
         resizeCanvas();
         window.addEventListener('resize', resizeCanvas);
         
-        // Click to skip
-        canvas.addEventListener('click', () => {
-            if (state.animationPhase !== 'fadingOut') {
-                state.animationPhase = 'fadingOut';
-                state.timer = 0;
+        // Click to skip (only if not swiping)
+        let clickStartX = 0;
+        canvas.addEventListener('mousedown', (e) => {
+            clickStartX = e.clientX;
+        });
+        
+        canvas.addEventListener('click', (e) => {
+            // Only trigger skip if it was a click, not a swipe
+            if (Math.abs(e.clientX - clickStartX) < 10) {
+                if (state.animationPhase !== 'fadingOut') {
+                    state.animationPhase = 'fadingOut';
+                    state.timer = 0;
+                }
             }
         });
         
@@ -282,6 +500,23 @@
             currentSumIndex: 0,
             summationFadeStart: 0,
             summationFadeDuration: 1500
+        };
+        
+        // Arc length state
+        const arcState = {
+            currentSegments: 1,
+            maxSegments: 100,
+            segmentBuildDuration: 150,
+            baseBuildDuration: 150,
+            animationPhase: 'fadingIn',
+            timer: 0,
+            holdTimer: 0,
+            holdDuration: 1500,
+            fadeDuration: 800,
+            fadeAlpha: 0,
+            lowerBound: -Math.PI,
+            upperBound: Math.PI,
+            targetSegments: 100
         };
         
         // Update summation notation display
@@ -687,6 +922,38 @@
             polynomialDisplay.style.color = state.polynomialColor;
             polynomialDisplay.innerHTML = '0';
             updateSummationDisplay();
+            
+            // Initialize arc length state
+            initArcLengthState();
+        }
+        
+        function initArcLengthState() {
+            const xRange = Math.PI * state.xRangeMultiplier;
+            
+            // Random bounds within the function's range
+            const minX = -xRange;
+            const maxX = xRange;
+            const range = maxX - minX;
+            
+            // Generate random bounds (at least 30% of total range)
+            const minRange = range * 0.3;
+            const boundRange = minRange + Math.random() * (range - minRange);
+            const startPos = minX + Math.random() * (range - boundRange);
+            
+            arcState.lowerBound = startPos;
+            arcState.upperBound = startPos + boundRange;
+            arcState.currentSegments = 1;
+            arcState.maxSegments = 100;
+            arcState.targetSegments = 1;
+            arcState.animationPhase = 'fadingIn';
+            arcState.timer = 0;
+            arcState.holdTimer = 0;
+            arcState.fadeAlpha = 0;
+            arcState.segmentBuildDuration = arcState.baseBuildDuration;
+            
+            funcLabel2.textContent = `Arc Length of ${state.currentFunction.label}`;
+            funcLabel2.style.color = state.currentColor;
+            arcLengthDisplay.style.color = state.polynomialColor;
         }
         
         // Update polynomial display with fade-in effect
@@ -868,9 +1135,247 @@
             requestAnimationFrame(animate);
         }
         
+        // Click to skip on page 2
+        canvas2.addEventListener('click', () => {
+            if (arcState.animationPhase !== 'fadingOut') {
+                arcState.animationPhase = 'fadingOut';
+                arcState.timer = 0;
+            }
+        });
+        
+        // Arc length calculation (Page 2)
+        function calculateArcLength(func, xStart, xEnd, segments) {
+            let length = 0;
+            const dx = (xEnd - xStart) / segments;
+            
+            for (let i = 0; i < segments; i++) {
+                const x1 = xStart + i * dx;
+                const x2 = x1 + dx;
+                const y1 = func(x1);
+                const y2 = func(x2);
+                
+                if (isFinite(y1) && isFinite(y2)) {
+                    const segmentLength = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
+                    length += segmentLength;
+                }
+            }
+            
+            return length;
+        }
+        
+        // Draw arc length visualization
+        function drawArcLengthVisualization(segments, fadeAlpha = 1) {
+            if (!state.currentFunction) return;
+            
+            // Clear canvas
+            ctx2.fillStyle = '#000';
+            ctx2.fillRect(0, 0, canvas2.width, canvas2.height);
+            
+            // Draw axes
+            const xRange = Math.PI * state.xRangeMultiplier;
+            ctx2.strokeStyle = '#555';
+            ctx2.lineWidth = 1.5;
+            
+            const y0 = worldToScreen(0, 0).y;
+            const x0 = worldToScreen(0, 0).x;
+            
+            // X-axis
+            ctx2.beginPath();
+            ctx2.moveTo(0, y0);
+            ctx2.lineTo(canvas2.width, y0);
+            ctx2.stroke();
+            
+            // Y-axis
+            ctx2.beginPath();
+            ctx2.moveTo(x0, 0);
+            ctx2.lineTo(x0, canvas2.height);
+            ctx2.stroke();
+            
+            // Draw the full function curve
+            ctx2.globalAlpha = fadeAlpha;
+            ctx2.strokeStyle = state.currentColor;
+            ctx2.lineWidth = 3;
+            ctx2.beginPath();
+            
+            let started = false;
+            const step = (2 * xRange) / (canvas2.width * 2);
+            
+            for (let x = -xRange; x <= xRange; x += step) {
+                const y = state.currentFunction.compute(x);
+                if (!isFinite(y) || Math.abs(y) > 100) continue;
+                
+                const screen = worldToScreen(x, y);
+                
+                if (!started) {
+                    ctx2.moveTo(screen.x, screen.y);
+                    started = true;
+                } else {
+                    ctx2.lineTo(screen.x, screen.y);
+                }
+            }
+            
+            ctx2.stroke();
+            
+            // Draw bounds markers
+            ctx2.strokeStyle = `rgba(255, 100, 100, ${0.6 * fadeAlpha})`;
+            ctx2.lineWidth = 2;
+            ctx2.setLineDash([5, 5]);
+            
+            const lowerScreen = worldToScreen(arcState.lowerBound, 0);
+            const upperScreen = worldToScreen(arcState.upperBound, 0);
+            
+            ctx2.beginPath();
+            ctx2.moveTo(lowerScreen.x, 0);
+            ctx2.lineTo(lowerScreen.x, canvas2.height);
+            ctx2.stroke();
+            
+            ctx2.beginPath();
+            ctx2.moveTo(upperScreen.x, 0);
+            ctx2.lineTo(upperScreen.x, canvas2.height);
+            ctx2.stroke();
+            
+            ctx2.setLineDash([]);
+            
+            // Draw line segments for approximation (only between bounds)
+            const segmentStep = (arcState.upperBound - arcState.lowerBound) / segments;
+            
+            ctx2.strokeStyle = state.polynomialColor;
+            ctx2.lineWidth = 2;
+            
+            for (let i = 0; i < segments; i++) {
+                const x1 = arcState.lowerBound + i * segmentStep;
+                const x2 = x1 + segmentStep;
+                const y1 = state.currentFunction.compute(x1);
+                const y2 = state.currentFunction.compute(x2);
+                
+                if (isFinite(y1) && isFinite(y2) && Math.abs(y1) < 100 && Math.abs(y2) < 100) {
+                    const screen1 = worldToScreen(x1, y1);
+                    const screen2 = worldToScreen(x2, y2);
+                    
+                    ctx2.beginPath();
+                    ctx2.moveTo(screen1.x, screen1.y);
+                    ctx2.lineTo(screen2.x, screen2.y);
+                    ctx2.stroke();
+                    
+                    // Draw dots at endpoints
+                    ctx2.fillStyle = state.polynomialColor;
+                    ctx2.beginPath();
+                    ctx2.arc(screen1.x, screen1.y, 3, 0, Math.PI * 2);
+                    ctx2.fill();
+                }
+            }
+            
+            // Final point
+            const finalY = state.currentFunction.compute(arcState.upperBound);
+            if (isFinite(finalY) && Math.abs(finalY) < 100) {
+                const finalScreen = worldToScreen(arcState.upperBound, finalY);
+                ctx2.fillStyle = state.polynomialColor;
+                ctx2.beginPath();
+                ctx2.arc(finalScreen.x, finalScreen.y, 3, 0, Math.PI * 2);
+                ctx2.fill();
+            }
+            
+            ctx2.globalAlpha = 1;
+            
+            // Calculate and display arc length
+            const arcLength = calculateArcLength(state.currentFunction.compute, arcState.lowerBound, arcState.upperBound, Math.floor(segments));
+            arcLengthDisplay.textContent = `${arcLength.toFixed(4)} (n=${Math.floor(segments)})`;
+        }
+        
+        // Animation loop for page 2
+        let lastTime2 = 0;
+        
+        function animatePage2(currentTime) {
+            const dt = currentTime - lastTime2;
+            lastTime2 = currentTime;
+            
+            if (currentPage === 2 && state.currentFunction) {
+                // Update arc length animation state
+                if (arcState.animationPhase === 'fadingIn') {
+                    arcState.timer += dt;
+                    arcState.fadeAlpha = Math.min(1, arcState.timer / arcState.fadeDuration);
+                    
+                    if (arcState.fadeAlpha >= 1) {
+                        arcState.animationPhase = 'building';
+                        arcState.timer = 0;
+                    }
+                    
+                    drawArcLengthVisualization(arcState.currentSegments, arcState.fadeAlpha);
+                    
+                } else if (arcState.animationPhase === 'building') {
+                    arcState.timer += dt;
+                    
+                    // Gradually increase segments
+                    const progress = Math.min(1, arcState.timer / arcState.segmentBuildDuration);
+                    arcState.currentSegments = lerp(arcState.targetSegments, arcState.targetSegments + 1, smoothStep(progress));
+                    
+                    drawArcLengthVisualization(arcState.currentSegments, 1);
+                    
+                    if (progress >= 1) {
+                        arcState.targetSegments++;
+                        arcState.timer = 0;
+                        
+                        // Speed up after initial segments
+                        if (arcState.targetSegments > 10) {
+                            arcState.segmentBuildDuration = arcState.baseBuildDuration * 0.5;
+                        }
+                        if (arcState.targetSegments > 30) {
+                            arcState.segmentBuildDuration = arcState.baseBuildDuration * 0.2;
+                        }
+                        
+                        // Check if done
+                        if (arcState.targetSegments >= arcState.maxSegments) {
+                            arcState.animationPhase = 'holding';
+                            arcState.holdTimer = 0;
+                        }
+                    }
+                    
+                } else if (arcState.animationPhase === 'holding') {
+                    arcState.holdTimer += dt;
+                    
+                    drawArcLengthVisualization(arcState.currentSegments, 1);
+                    
+                    if (arcState.holdTimer >= arcState.holdDuration) {
+                        arcState.animationPhase = 'fadingOut';
+                        arcState.timer = 0;
+                    }
+                    
+                } else if (arcState.animationPhase === 'fadingOut') {
+                    arcState.timer += dt;
+                    arcState.fadeAlpha = Math.max(0, 1 - arcState.timer / arcState.fadeDuration);
+                    
+                    drawArcLengthVisualization(arcState.currentSegments, arcState.fadeAlpha);
+                    
+                    if (arcState.fadeAlpha <= 0) {
+                        // Trigger new function on page 1 which will also init arc state
+                        initNewFunction();
+                        arcState.animationPhase = 'fadingIn';
+                        arcState.timer = 0;
+                        
+                        // Also reset page 1
+                        state.animationPhase = 'fadingIn';
+                        state.timer = 0;
+                    }
+                }
+            }
+            
+            requestAnimationFrame(animatePage2);
+        }
+        
         // Start animation
         initNewFunction();
+        
+        // Set up initial page state if page 2 is requested
+        if (initialPage === 2) {
+            // Immediately set the correct classes without animation
+            page1.classList.remove('active');
+            page1.classList.add('slide-left');
+            page2.classList.remove('slide-right');
+            page2.classList.add('active');
+        }
+        
         requestAnimationFrame(animate);
+        requestAnimationFrame(animatePage2);
     </script>
 </body>
 </html>
