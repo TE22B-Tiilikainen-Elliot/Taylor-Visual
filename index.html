@@ -107,57 +107,6 @@
             line-height: 0.8;
         }
         
-        #infiniteToggle {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            border-radius: 8px;
-            padding: 12px 16px;
-            color: #fff;
-            font-size: 14px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            pointer-events: auto;
-            backdrop-filter: blur(10px);
-            transition: all 0.3s ease;
-            cursor: pointer;
-        }
-        
-        #infiniteToggle:hover {
-            background: rgba(255, 255, 255, 0.1);
-            border-color: rgba(255, 255, 255, 0.3);
-        }
-        
-        .toggle-switch {
-            width: 40px;
-            height: 20px;
-            background: rgba(255, 255, 255, 0.2);
-            border-radius: 10px;
-            position: relative;
-            transition: background 0.3s;
-        }
-        
-        .toggle-switch.active {
-            background: #4ecdc4;
-        }
-        
-        .toggle-switch .slider {
-            width: 16px;
-            height: 16px;
-            background: #fff;
-            border-radius: 50%;
-            position: absolute;
-            top: 2px;
-            left: 2px;
-            transition: transform 0.3s;
-        }
-        
-        .toggle-switch.active .slider {
-            transform: translateX(20px);
-        }
         
         
         @keyframes termFadeIn {
@@ -272,12 +221,6 @@
             </div>
         </div>
     </div>
-    <div id="infiniteToggle">
-        <span>Show ∞</span>
-        <div class="toggle-switch active">
-            <div class="slider"></div>
-        </div>
-    </div>
     
     <script>
         const canvas = document.getElementById('canvas');
@@ -286,8 +229,6 @@
         const polynomialDisplay = document.getElementById('polynomial');
         const sumLower = document.getElementById('sumLower');
         const sumUpper = document.getElementById('sumUpper');
-        const infiniteToggle = document.getElementById('infiniteToggle');
-        let showInfinite = true;
         
         // Canvas setup
         function resizeCanvas() {
@@ -303,14 +244,6 @@
                 state.animationPhase = 'fadingOut';
                 state.timer = 0;
             }
-        });
-        
-        // Infinite toggle
-        infiniteToggle.addEventListener('click', (e) => {
-            e.stopPropagation();
-            showInfinite = !showInfinite;
-            infiniteToggle.querySelector('.toggle-switch').classList.toggle('active', showInfinite);
-            updateSummationDisplay();
         });
         
         // Color palette
@@ -346,18 +279,16 @@
             fadeDuration: 800, // ms for fade transitions
             xRangeMultiplier: 1,
             lastCompletedTermIndex: -1,
-            currentSumIndex: 0
+            currentSumIndex: 0,
+            summationFadeStart: 0,
+            summationFadeDuration: 1500
         };
         
         // Update summation notation display
         function updateSummationDisplay() {
             sumLower.textContent = state.currentSumIndex;
             const isInfiniteSeries = state.currentFunction && state.currentFunction.isInfinite;
-            if ((showInfinite && isInfiniteSeries) || state.animationPhase !== 'holding') {
-                sumUpper.textContent = '∞';
-            } else {
-                sumUpper.textContent = state.maxTerms - 1;
-            }
+            sumUpper.textContent = isInfiniteSeries ? '∞' : state.maxTerms - 1;
         }
         
         // Generate random polynomial function
@@ -398,9 +329,6 @@
         const functionGenerators = [
             () => {
                 const xMult = 2 + Math.random() * 2;
-                const maxX = Math.PI * xMult;
-                // Calculate terms needed for very high accuracy
-                const termsNeeded = Math.ceil(maxX * 2.5) + 10;
                 return {
                     label: 'sin(x)',
                     compute: (x) => Math.sin(x),
@@ -409,16 +337,15 @@
                         const sign = Math.pow(-1, (n - 1) / 2);
                         return sign / factorialMemo(n);
                     },
-                    maxTerms: termsNeeded,
+                    maxTerms: 100,
                     xRangeMultiplier: xMult,
                     isTrig: true,
-                    isInfinite: true
+                    isInfinite: true,
+                    summationFormula: '<span class="fraction"><span class="numerator">(-1)<sup>n</sup>x<sup>2n+1</sup></span><span class="denominator">(2n+1)!</span></span>'
                 };
             },
             () => {
                 const xMult = 2 + Math.random() * 2;
-                const maxX = Math.PI * xMult;
-                const termsNeeded = Math.ceil(maxX * 2.5) + 10;
                 return {
                     label: 'cos(x)',
                     compute: (x) => Math.cos(x),
@@ -427,10 +354,11 @@
                         const sign = Math.pow(-1, n / 2);
                         return sign / factorialMemo(n);
                     },
-                    maxTerms: termsNeeded,
+                    maxTerms: 100,
                     xRangeMultiplier: xMult,
                     isTrig: true,
-                    isInfinite: true
+                    isInfinite: true,
+                    summationFormula: '<span class="fraction"><span class="numerator">(-1)<sup>n</sup>x<sup>2n</sup></span><span class="denominator">(2n)!</span></span>'
                 };
             },
             () => ({
@@ -439,30 +367,29 @@
                 getCoefficient: (n) => {
                     return 1 / factorialMemo(n);
                 },
-                maxTerms: 15,
+                maxTerms: 80,
                 xRangeMultiplier: 1,
                 isTrig: false,
-                isInfinite: true
+                isInfinite: true,
+                summationFormula: '<span class="fraction"><span class="numerator">x<sup>n</sup></span><span class="denominator">n!</span></span>'
             }),
             () => {
-                const termsNeeded = 35;
                 return {
                     label: 'arctan(x)',
                     compute: (x) => Math.atan(x),
                     getCoefficient: (n) => {
-                        // arctan: x - x^3/3 + x^5/5 - x^7/7 + ...
                         if (n % 2 === 0) return 0;
                         const sign = Math.pow(-1, (n - 1) / 2);
                         return sign / n;
                     },
-                    maxTerms: termsNeeded,
+                    maxTerms: 80,
                     xRangeMultiplier: 1,
                     isTrig: true,
-                    isInfinite: true
+                    isInfinite: true,
+                    summationFormula: '<span class="fraction"><span class="numerator">(-1)<sup>n</sup>x<sup>2n+1</sup></span><span class="denominator">2n+1</span></span>'
                 };
             },
             () => {
-                const termsNeeded = 30;
                 return {
                     label: 'ln(1+x)',
                     compute: (x) => {
@@ -470,15 +397,15 @@
                         return Math.log(1 + x);
                     },
                     getCoefficient: (n) => {
-                        // ln(1+x): x - x^2/2 + x^3/3 - x^4/4 + ...
                         if (n === 0) return 0;
                         const sign = Math.pow(-1, n + 1);
                         return sign / n;
                     },
-                    maxTerms: termsNeeded,
+                    maxTerms: 60,
                     xRangeMultiplier: 0.8,
                     isTrig: true,
-                    isInfinite: true
+                    isInfinite: true,
+                    summationFormula: '<span class="fraction"><span class="numerator">(-1)<sup>n+1</sup>x<sup>n</sup></span><span class="denominator">n</span></span>'
                 };
             },
             generateRandomPolynomial,
@@ -752,6 +679,9 @@
             state.currentSumIndex = 0;
             state.termBuildDuration = state.baseBuildDuration;
             
+            console.log(`New function: ${func.label}, maxTerms: ${func.maxTerms}`);
+            console.log('Function object:', func);
+            
             funcLabel.textContent = func.label;
             funcLabel.style.color = state.currentColor;
             polynomialDisplay.style.color = state.polynomialColor;
@@ -763,6 +693,14 @@
         function updatePolynomialDisplay(lastCompletedIndex = -1) {
             const html = formatPolynomial(state.terms, lastCompletedIndex);
             polynomialDisplay.innerHTML = html;
+            
+            // Check if content would wrap to multiple lines or after 15 terms
+            const shouldShowSummation = state.currentTermIndex > 15 || 
+                                        polynomialDisplay.scrollWidth > polynomialDisplay.clientWidth;
+            
+            if (shouldShowSummation && state.currentFunction && state.currentFunction.summationFormula) {
+                polynomialDisplay.innerHTML = state.currentFunction.summationFormula;
+            }
         }
         
         // Animation loop
@@ -866,7 +804,12 @@
                         if (state.currentTermIndex > speedupStart) {
                             const termsAfterSpeedup = state.currentTermIndex - speedupStart;
                             state.termBuildDuration = state.baseBuildDuration * Math.pow(speedupFactor, termsAfterSpeedup);
-                            state.termBuildDuration = Math.max(state.termBuildDuration, 50);
+                            state.termBuildDuration = Math.max(state.termBuildDuration, 100);
+                        }
+                        
+                        // Debug logging
+                        if (state.currentTermIndex % 10 === 0) {
+                            console.log(`Term ${state.currentTermIndex}/${state.maxTerms}, duration: ${state.termBuildDuration.toFixed(0)}ms`);
                         }
                         
                         // Trigger display update with fade animation
